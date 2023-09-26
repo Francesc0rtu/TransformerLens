@@ -323,6 +323,7 @@ class HookedRootModule(nn.Module):
         bwd_hooks: List[Tuple[Union[str, Callable], Callable]] = [],
         reset_hooks_end=True,
         clear_contexts=False,
+        return_cache=False,
         **model_kwargs,
     ):
         """
@@ -351,6 +352,27 @@ class HookedRootModule(nn.Module):
                 "WARNING: Hooks will be reset at the end of run_with_hooks. This removes the backward hooks before a backward pass can occur."
             )
 
+        if return_cache:
+            cache_dict, fwd, bwd = self.get_caching_hooks(
+                names_filter=None,
+                incl_bwd=False,
+                device=None,
+                remove_batch_dim=False,
+                cache=None,
+            )
+            
+            # join the hooks
+            fwd.extend(fwd_hooks)
+            bwd.extend(bwd_hooks)
+            
+            with self.hooks(
+                fwd_hooks=fwd,
+                bwd_hooks=bwd,
+                reset_hooks_end=reset_hooks_end,
+                clear_contexts=clear_contexts,
+            ):
+                return self.forward(*model_args, **model_kwargs), cache_dict
+        
         with self.hooks(
             fwd_hooks, bwd_hooks, reset_hooks_end, clear_contexts
         ) as hooked_model:
